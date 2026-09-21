@@ -4863,43 +4863,33 @@ const IncensePage = ({
   };
   const formatTime = t => Player ? Player.formatTime(t) : '0:00';
 
-  // 三款线香数据
+  // 【启·归】二元显化香
   const incenses = [{
     num: '壹',
-    name: '启阳',
-    subtitle: '天之动 · 破局与发射',
-    color: '#C0392B',
-    colorName: '朱砂红',
+    name: '云启',
+    subtitle: '向外 · 接引机缘',
+    color: '#D4AF37',
+    colorName: '鎏金',
     icon: 'sun',
-    scenes: ['当你需要强力突破（面试、重要谈判、攻克大客户）', '感到能量低迷，需要迅速提振士气、找回野心', '晨起立项、许下宏大愿景时'],
-    time: '首选辰时（07:00-09:00）"龙抬头"之时，阳气初升锐利；次选午时（11:00-13:00）阳气极盛',
-    direction: '西北方（乾位），代表天、权威与贵人，意在"上达天听"',
-    mind: '霸气、确信、不要乞求，像君王下旨一样笃定。观想：烟如金剑或冲天光柱穿透愿望直达宇宙核心。',
-    mantra: '我是[你的名字]，我在此立下意图。我调动乾阳之气，为我的[具体愿望]开路。障碍已除，指令已达。如此，便成。'
+    scenes: ['想招贵人、开拓财路，让新机会主动找上门', '新项目启动、需要灵感突破、仪式开场时', '感觉闭塞困顿，想让外部资源重新流动起来'],
+    time: '首选辰时（07:00-09:00）阳气升发、通道最通透；次选巳时（09:00-11:00）思路清明',
+    direction: '东南方（生气财位），面朝门窗气口，向外界打开通道',
+    mind: '开放、笃定、不抓取。观想：烟如金线向四方延伸，把散落各处的机缘一根根牵回身边。',
+    mantra: '我是[你的名字]。我在此打开通道，万缘赴约。贵人见我，机会向我，财路为我而开。',
+    engrave: '云启 · 万缘赴约'
   }, {
     num: '贰',
-    name: '中和',
-    subtitle: '人之和 · 转化与生发',
-    color: '#C9A96E',
-    colorName: '土黄金',
-    icon: 'sparkles',
-    scenes: ['日常办公、处理繁杂事务，需要极度专注与高效', '感到内耗、焦虑、心浮气躁，急需抚平情绪', '流量转化、客户跟进，需要把"机会"转化为"确切订单"'],
-    time: '全天适用，未时（13:00-15:00）特荐，阳气向阴柔过渡的转折点',
-    direction: '中宫（房间或办公室正中央），居土镇守四方，代表四平八稳的核心基本盘',
-    mind: '平和、专注、充实，感受"手中有粮心中不慌"的底气。观想：烟雾如金灿灿麦浪包裹你，大地能量修正合一拔节生长。',
-    mantra: '致中和，万物育。我居天地之中，安身立命。万般资源皆在此为我转化，适时化育，生生不息。'
-  }, {
-    num: '叁',
-    name: '归藏',
-    subtitle: '地之静 · 承载与封存',
-    color: '#3B5998',
-    colorName: '黛蓝',
+    name: '静归',
+    subtitle: '向内 · 守本归元',
+    color: '#C5CAD1',
+    colorName: '素银',
     icon: 'feather',
-    scenes: ['需要最终结果（资金入账、合同落笔、关系确立）', '睡前冥想、复盘感恩，需要彻底向下防御'],
-    time: '首选酉时（17:00-19:00）日落金气旺，适合收纳结果；次选亥时（21:00-23:00）极静直通潜意识',
-    direction: '西南方（坤位），代表包容储藏，意在"落地生根，财库丰盈"',
-    mind: '柔软、感恩、安心，感受财富与爱被稳稳托住的踏实。观想：烟雾如水雾下沉铺满地板化作沃土，愿望如种子落入被大地接住。',
-    mantra: '地势坤，厚德载物。感谢宇宙馈赠，我已敞开接收[具体愿望]的果实。能量在此归藏，落袋为安。我很丰盛，我很安全。'
+    scenes: ['守财固库，不让已有的成果白白流失', '平复焦虑内耗、心浮气躁，睡前冥想静心', '显化仪式收尾，稳住愿力、锚定终点状态'],
+    time: '首选酉时（17:00-19:00）日落归藏、宜收纳结果；次选亥时（21:00-23:00）极静直通潜意识',
+    direction: '中宫（房间或办公室正中央），居中之守，镇守归位',
+    mind: '柔软、安定、感恩。观想：烟如水下沉化作沃土，把已得的成果稳稳托住，沉入丹田。',
+    mantra: '我本具足，无需外求。机缘已至，我接得住、守得牢。财入库，心安住。',
+    engrave: '静归 · 吾本具足'
   }];
   const iconMap = {
     sun: /*#__PURE__*/React.createElement(SunIcon, {
@@ -4914,27 +4904,27 @@ const IncensePage = ({
   };
   const formationSteps = [{
     num: '一',
-    name: '立极',
-    desc: '桌子正中央点燃【中和】，静坐3分钟深呼吸，倒空杂念稳住磁场'
+    name: '晨 · 启',
+    desc: '东南方点燃【云启】，像下订单一样笃定说出具体目标，不乞求、不犹豫'
   }, {
     num: '二',
-    name: '借天',
-    desc: '西北方点燃【启阳】，想象头顶能量通道打开，宇宙灵感机遇涌来'
+    name: '日中 · 行',
+    desc: '照常做事，让机会自由流动，不焦虑结果，也不反复追问'
   }, {
     num: '三',
-    name: '承地',
-    desc: '西南方点燃【归藏】，想象身下财库打开，接纳财富好运'
+    name: '暮 · 归',
+    desc: '中宫点燃【静归】，感恩当下已得，把成果稳稳锚定、封存入库'
   }, {
     num: '四',
-    name: '合流',
-    desc: '坐三柱香能量场中心，将核心愿望写在纸上压在【中和】香插下，静候香燃尽'
+    name: '合 · 闭环',
+    desc: '两香同燃片刻，静坐感受「外已接引，内已锚定」，一收一放，圆满成环'
   }];
   const fengshuiTips = [{
     title: '观烟识运',
-    items: ['启香烟乱 = 目标阻力大，需复盘策略', '中和烟乱 = 内心严重内耗，需深呼吸', '归藏烟乱 = 环境磁场浑浊，需打扫或补觉']
+    items: ['云启烟乱 = 想要的方向还没厘清，先问清自己真正要什么', '静归烟乱 = 内耗未清，先深呼吸，或补一觉再说']
   }, {
     title: '香灰玄机',
-    items: ['启阳香灰随风扬散 = 象征指令发散宇宙', '归藏香灰收集在小罐 = 象征积攒财气只进不出', '中和香灰倒入绿植盆栽 = 象征落叶归根反哺化育']
+    items: ['云启香灰随风扬散 = 心愿已发往四方，静待回响', '静归香灰收集入罐 = 财气归库，只进不出']
   }];
   return /*#__PURE__*/React.createElement("div", {
     className: "page page-enter"
@@ -4948,9 +4938,9 @@ const IncensePage = ({
     className: "page-header"
   }, /*#__PURE__*/React.createElement("div", {
     className: "page-header-title gold-text"
-  }, "\u5929\u5730\u4EBA\u4E09\u624D \xB7 \u7EBF\u9999\u663E\u5316"), /*#__PURE__*/React.createElement("div", {
+  }, "\u3010\u542F\xB7\u5F52\u3011\u4E8C\u5143\u663E\u5316\u9999"), /*#__PURE__*/React.createElement("div", {
     className: "page-header-subtitle"
-  }, "INCENSE RITUAL")), /*#__PURE__*/React.createElement("div", {
+  }, "DUAL INCENSE RITUAL")), /*#__PURE__*/React.createElement("div", {
     className: "music-player single-track"
   }, /*#__PURE__*/React.createElement("div", {
     className: "player-title"
@@ -5004,8 +4994,8 @@ const IncensePage = ({
     className: "intro-title"
   }, "\u4E91\u8212\u8BF4"), /*#__PURE__*/React.createElement("p", {
     className: "intro-text"
-  }, "\u4E00\u5957\u5B8C\u6574\u7684\u663E\u5316\uFF0C\u79BB\u4E0D\u5F00\u5929\u4E4B\u65F6\u3001\u5730\u4E4B\u5229\u3001\u4EBA\u548C\u4E4B\u6C14\u3002\u8FD9\u4E09\u6B3E\u7EBF\u9999\uFF0C\u5BF9\u5E94\u4F60\u4E00\u5929\u7684\u80FD\u91CF\u6D41\u8F6C\u2014\u2014 \u6668\u8D77\u501F\u5929\u4E4B\u9633\u4EE5\u542F\u613F\uFF0C\u65E5\u4E2D\u5C45\u4EBA\u4E4B\u548C\u4EE5\u8F6C\u5316\uFF0C\u65E5\u66AE\u627F\u5730\u4E4B\u9759\u4EE5\u5F52\u85CF\u3002 \u8BF7\u4F9D\u5FAA\u4EE5\u4E0B\u4EEA\u8F68\uFF0C\u5F00\u542F\u4F60\u7684\u4E13\u5C5E\u80FD\u91CF\u573A\u3002")), /*#__PURE__*/React.createElement(SectionHeading, {
-    text: "\u4E09\u6B3E\u7EBF\u9999"
+  }, "\u4E00\u9999\u5411\u5916\u542F\u673A\u7F18\uFF0C\u4E00\u9999\u5411\u5185\u5F52\u672C\u5FC3\u3002 \u5411\u5916\uFF0C\u662F\u628A\u672C\u8BE5\u5C5E\u4E8E\u4F60\u7684\u8D35\u4EBA\u4E0E\u673A\u4F1A\u611F\u53EC\u800C\u6765\uFF1B\u5411\u5185\uFF0C\u662F\u8BA9\u81EA\u5DF1\u6709\u8DB3\u591F\u7684\u5BB9\u5668\u63A5\u5F97\u4F4F\u3001\u5B88\u5F97\u7262\u3002 \u4E00\u542F\u4E00\u5F52\uFF0C\u4E00\u653E\u4E00\u6536\uFF0C\u6784\u6210\u5B8C\u6574\u7684\u663E\u5316\u95ED\u73AF\u3002\u539F\u6728\u7B52\u8EAB\uFF0C\u91D1\u6807\u4E3A\u542F\uFF0C\u94F6\u6807\u4E3A\u5F52\u3002")), /*#__PURE__*/React.createElement(SectionHeading, {
+    text: "\u4E24\u6B3E\u7EBF\u9999"
   }), /*#__PURE__*/React.createElement("div", {
     className: "ritual-steps"
   }, incenses.map(inc => /*#__PURE__*/React.createElement("div", {
@@ -5046,7 +5036,7 @@ const IncensePage = ({
       color: 'var(--text-primary)',
       marginTop: 6
     }
-  }, "\u6700\u4F73\u5409\u65F6 \xB7 \u5929\u65F6"), /*#__PURE__*/React.createElement("div", {
+  }, "\u6700\u4F73\u5409\u65F6"), /*#__PURE__*/React.createElement("div", {
     className: "ritual-step-item"
   }, inc.time), /*#__PURE__*/React.createElement("div", {
     className: "ritual-step-item",
@@ -5055,7 +5045,7 @@ const IncensePage = ({
       color: 'var(--text-primary)',
       marginTop: 6
     }
-  }, "\u6700\u4F73\u65B9\u4F4D \xB7 \u5730\u5229"), /*#__PURE__*/React.createElement("div", {
+  }, "\u6700\u4F73\u65B9\u4F4D"), /*#__PURE__*/React.createElement("div", {
     className: "ritual-step-item"
   }, inc.direction), /*#__PURE__*/React.createElement("div", {
     className: "ritual-step-item",
@@ -5064,31 +5054,45 @@ const IncensePage = ({
       color: 'var(--text-primary)',
       marginTop: 6
     }
-  }, "\u663E\u5316\u5FC3\u6CD5 \xB7 \u4EBA\u548C"), /*#__PURE__*/React.createElement("div", {
+  }, "\u663E\u5316\u5FC3\u6CD5"), /*#__PURE__*/React.createElement("div", {
     className: "ritual-step-item"
   }, inc.mind), /*#__PURE__*/React.createElement("div", {
     className: "ritual-step-item",
     style: {
       fontWeight: 600,
-      color: 'var(--gold-primary)',
+      color: inc.color,
       marginTop: 6
     }
   }, "\u5FC3\u4E4B\u5BA3\u8A00"), /*#__PURE__*/React.createElement("div", {
     className: "ritual-step-item",
     style: {
       fontStyle: 'italic',
-      color: 'var(--gold-light)',
-      fontFamily: 'var(--font-serif)'
+      color: inc.color,
+      fontFamily: 'var(--font-serif)',
+      opacity: 0.92
     }
-  }, "\u300C", inc.mantra, "\u300D"))))), /*#__PURE__*/React.createElement(SectionHeading, {
-    text: "\u4E09\u624D\u5927\u5706\u6EE1\u9635\u6CD5"
+  }, "\u300C", inc.mantra, "\u300D"), /*#__PURE__*/React.createElement("div", {
+    className: "ritual-step-item",
+    style: {
+      fontWeight: 600,
+      color: 'var(--text-primary)',
+      marginTop: 6
+    }
+  }, "\u7B52\u8EAB\u94ED\u523B"), /*#__PURE__*/React.createElement("div", {
+    className: "ritual-step-item",
+    style: {
+      color: inc.color,
+      letterSpacing: 2
+    }
+  }, inc.engrave))))), /*#__PURE__*/React.createElement(SectionHeading, {
+    text: "\u542F\u5F52\u95ED\u73AF \xB7 \u65E5\u7528\u4EEA\u8F68"
   }), /*#__PURE__*/React.createElement("div", {
     className: "notice-block"
   }, /*#__PURE__*/React.createElement("div", {
     className: "notice-title"
   }, /*#__PURE__*/React.createElement(SparklesIcon, {
     size: 18
-  }), "\u5468\u672B / \u521D\u4E00\u5341\u4E94\u6DF1\u5EA6\u663E\u5316"), /*#__PURE__*/React.createElement("div", {
+  }), "\u6668\u542F\u66AE\u5F52 \xB7 \u4E00\u65E5\u4E00\u5FAA\u73AF"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexDirection: 'column',
