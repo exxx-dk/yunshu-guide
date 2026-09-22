@@ -2664,6 +2664,21 @@ window.TUTORIAL_VIDEO = {
       });
       a.addEventListener('ended', function() { self.playing = false; });
 
+      // ★ 必须挂进文档：iOS Safari / 微信 X5 对游离的 <audio> 元素播放并不可靠，
+      //   历史上有大量「JS 里 play() 不报错但就是没声音」的案例。
+      //   用 1px 透明容器隐藏，而不是 display:none（部分内核对 display:none 的媒体
+      //   会当作非活跃元素而不解码）。
+      if (!FileTrack._host) {
+        var host = document.createElement('div');
+        host.id = 'yunshu-audio-host';
+        host.setAttribute('aria-hidden', 'true');
+        host.style.cssText = 'position:absolute;left:-9999px;top:0;width:1px;height:1px;' +
+                             'overflow:hidden;opacity:0;pointer-events:none;';
+        (document.body || document.documentElement).appendChild(host);
+        FileTrack._host = host;
+      }
+      FileTrack._host.appendChild(a);
+
       // 音量：优先走 WebAudio 增益（iOS 生效），否则退回 el.volume
       if (busReady && busCtx && busCtx.state === 'running' && busCtx.createMediaElementSource) {
         try {
@@ -2735,11 +2750,29 @@ window.TUTORIAL_VIDEO = {
   FileTrack.prototype.release = function() {
     this.pause();
     if (this.el) {
-      try { this.el.removeAttribute('src'); this.el.load(); } catch (e) {}
+      try {
+        this.el.removeAttribute('src');
+        this.el.load();
+        if (this.el.parentNode) this.el.parentNode.removeChild(this.el);
+      } catch (e) {}
     }
     this.el = null;
     this.node = null;
   };
+
+  // 同一个 URL 只建一个元素：反复开关音乐时不会堆积 <audio>，也能复用已缓冲的数据
+  var trackCache = {};
+  function makeTrack(url, loop, volume) {
+    var t = trackCache[url];
+    if (t && !t.broken) {
+      t.setVolume(volume);
+      t.loop = loop;
+      return t;
+    }
+    t = new FileTrack(url, loop, volume);
+    trackCache[url] = t;
+    return t;
+  }
 
   var audioCtx = null;
   function getCtx() {
@@ -3690,7 +3723,7 @@ window.TUTORIAL_VIDEO = {
     bgUserEnabled = true;
     bgPausedByMeditation = false;
 
-    var t = new FileTrack(bgFileUrl(), true, bgVolumeVal);
+    var t = makeTrack(bgFileUrl(), true, bgVolumeVal);
     t.onError = function() {
       if (bgMode !== 'file' || fileBg !== t) return;
       fileBg = null;
@@ -3713,8 +3746,7 @@ window.TUTORIAL_VIDEO = {
   function pauseBg() {
     if (bgMode === 'none') return false;
     if (bgMode === 'file') {
-      if (fileBg) fileBg.pause();
-      fileBg = null;
+      if (fileBg) fileBg.pause();     // 保留元素与播放位置，再开时秒续
       bgMode = 'none';
       bgUserEnabled = false;
       bgPausedByMeditation = false;
@@ -3736,7 +3768,6 @@ window.TUTORIAL_VIDEO = {
     if (bgMode === 'none') return;
     if (bgMode === 'file') {
       if (fileBg) fileBg.pause();
-      fileBg = null;
       bgMode = 'none';
       bgPausedByMeditation = true;
       if (bgOnStateChange) bgOnStateChange({ playing: false });
@@ -3760,7 +3791,7 @@ window.TUTORIAL_VIDEO = {
   function playAtmosphere() {
     if (atmMode !== 'none') return false;
     pauseBg();
-    var t = new FileTrack(atmFileUrl(), true, atmVolume);
+    var t = makeTrack(atmFileUrl(), true, atmVolume);
     t.onError = function() {
       if (atmMode !== 'file' || fileAtm !== t) return;
       fileAtm = null;
@@ -3781,7 +3812,6 @@ window.TUTORIAL_VIDEO = {
   function pauseAtmosphere() {
     if (atmMode === 'none') return false;
     if (fileAtm) fileAtm.pause();
-    fileAtm = null;
     atmMode = 'none';
     atmPlaying = false;
     if (atmOnStateChange) atmOnStateChange({ playing: false });
@@ -3794,13 +3824,15 @@ window.TUTORIAL_VIDEO = {
   }
 
   // ---------- 祈愿烛专属曲 ----------
-  function stopMedFile() {
+  function medStopTimer() {
     if (medTimer) { clearInterval(medTimer); medTimer = null; }
-    if (fileMed) {
-      fileMed.pause();
-      fileMed.rewind();
-    }
-    fileMed = null;
+  }
+
+  // 暂停但保留播放位置 —— 与页面进度条一致：暂停后按播放应从原处续，
+  // 若归零会出现「进度条停在 2:00，一按播放跳回 0:00」的割裂感
+  function medPauseFile() {
+    medStopTimer();
+    if (fileMed) fileMed.pause();
   }
 
   function medReportLoaded() {
@@ -3810,7 +3842,7 @@ window.TUTORIAL_VIDEO = {
   }
 
   function startMedProgress() {
-    if (medTimer) clearInterval(medTimer);
+    medStopTimer();
     medTimer = setInterval(function() {
       if (medMode !== 'file' || !fileMed || !fileMed.el) return;
       var el = fileMed.el;
@@ -3832,35 +3864,46 @@ window.TUTORIAL_VIDEO = {
   }
 
   function playMeditation(url, trackName, trackId) {
-    // 停掉当前正在播的
+    var u = trackUrl(url);
+    var switching = (medCurrentId !== trackId);
+
     if (medMode === 'file') {
-      stopMedFile();
-      medMode = 'none';
+      if (switching) {
+        medPauseFile();
+        if (fileMed) fileMed.rewind();
+        fileMed = null;
+        medMode = 'none';
+      }
     } else if (medMode === 'synth') {
-      synthPauseMeditation();
+      synthPauseMeditation();        // 合成器不支持续播，一律重来
       medMode = 'none';
     }
+    if (switching) medStopTimer();
 
     medCurrentId = trackId;
     medCurrentName = trackName;
 
-    var u = trackUrl(url);
     if (u) {
-      var t = new FileTrack(u, true, medVolume);
+      var t = (!switching && fileMed && fileMed.url === u)
+        ? fileMed
+        : makeTrack(u, true, medVolume);
+      if (t !== fileMed) { t.rewind(); t.setVolume(medVolume); }
       t.onError = function() {
         if (medMode !== 'file' || fileMed !== t) return;
-        stopMedFile();
+        medPauseFile();
+        fileMed = null;
         medMode = 'none';
         // 文件不可用 → 回落 v4 合成器，保证还有声音
         if (medOnError) medOnError({ trackId: trackId, error: '音频文件加载失败，已切换为内置合成音' });
         medFallbackToSynth(trackId, trackName, u);
       };
       if (t.play()) {
+        var isNew = (fileMed !== t);
         fileMed = t;
         medMode = 'file';
         duckBgForMed();
-        // 时长信息：元数据就绪后再上报，兼容慢网
-        if (fileMed.el) {
+        if (isNew && fileMed.el) {
+          // 时长信息：元数据就绪后再上报，兼容慢网
           fileMed.el.addEventListener('loadedmetadata', medReportLoaded);
           fileMed.el.addEventListener('durationchange', medReportLoaded);
         }
@@ -3878,7 +3921,7 @@ window.TUTORIAL_VIDEO = {
   function pauseMeditation() {
     if (medMode === 'none') return;
     if (medMode === 'file') {
-      stopMedFile();
+      medPauseFile();
       medMode = 'none';
       if (medOnStateChange) {
         medOnStateChange({ playing: false, trackId: medCurrentId, trackName: medCurrentName });
