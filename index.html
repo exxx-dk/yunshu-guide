@@ -2493,11 +2493,35 @@ window.PRODUCTS = [
   }
 ];
 
-// 背景音乐
+// 音乐由「原创离线渲染音频」提供（numpy/scipy 程序化合成 → 卷积混响 → MP3），
+// 同源托管在 GitHub Pages 的 /audio/ 目录下，微信内置浏览器可直接播放。
+// 若文件不可达，audio.js 会自动回落到内置的实时合成器。
+window.AUDIO_BASE = 'https://exxx-dk.github.io/yunshu-guide/audio/';
+
+// 全局背景音乐
 window.BG_MUSIC = {
   name: '云舒 · 清境',
+  file: 'bg-qingjing.mp3',      // 240s · D调 · 极简禅意，长时间循环用
   defaultVolume: 0.3,
 };
+
+// 仪式指南页 · 道观氛围音（独立成曲）
+window.ATMOSPHERE_MUSIC = {
+  name: '道观氛围',
+  file: 'atmosphere-daoguan.mp3', // 300s · A调 · 深沉肃穆，大混响
+  defaultVolume: 0.45,
+};
+
+// 八首祈愿烛专属曲：按 track.id 自动拼出 URL，新增产品无需再手填
+(function () {
+  var base = window.AUDIO_BASE;
+  (window.PRODUCTS || []).forEach(function (p) {
+    if (p.track && p.track.id) {
+      p.track.file = p.track.id + '.mp3';
+      p.track.url = base + p.track.file;
+    }
+  });
+})();
 </script>
   <script>// ===== 云舒 · 祈愿烛教学视频配置 =====
 // 封面已内联为 base64，页面无需额外请求
@@ -2522,12 +2546,200 @@ window.TUTORIAL_VIDEO = {
   ]
 };
 </script>
-  <script>// ===== 云舒 · 极简禅意音乐系统 v4 =====
-// 核心改进：节点统一管理 + 立即停止 + 干净切换
-// 风格：极简 · 稀疏 · 留白 · 古琴 · 箫/埙 · 钟声
+  <script>// ===== 云舒 · 冥想音乐引擎 v5 =====
+//
+// v4 → v5 变更（2026-09-22）：
+//   1) 音乐改为播放「原创离线渲染音频文件」，不再是 Web Audio 实时合成。
+//      原因：v4 全曲只有正弦波振荡器、没有任何混响、音符之间是数字静音，
+//      听感像电子琴试音，不是冥想音乐。新音频用卷积混响 + 模态合成 + 持续垫音重做。
+//   2) 三处播放位置各自独立成曲：
+//        全局背景音乐  → bg-qingjing.mp3        （240s）
+//        仪式页道观氛围 → atmosphere-daoguan.mp3 （300s，v4 里它错用了全局背景音乐）
+//        八首祈愿烛曲   → <trackId>.mp3          （各 180s）
+//   3) 全部同源托管（github.io 同域），微信内置浏览器可直接播放。
+//      v4 的实时合成器完整保留为兜底：任何文件加载失败都会自动回落，保证始终有声音。
+//   4) 音量优先经 WebAudio GainNode —— iOS 上 <audio>.volume 是无效的。
+//
+// v4 原有说明（合成兜底部分）：
+//   节点统一管理 + 立即停止 + 干净切换
+//   风格：极简 · 稀疏 · 留白 · 古琴 · 箫/埙 · 钟声
 
 (function() {
   'use strict';
+
+  // ============================================================
+  // 音频文件地址（同源，务必与页面同域，否则微信无法播放）
+  // ============================================================
+  var AUDIO_BASE = (window.AUDIO_BASE) ||
+    'https://exxx-dk.github.io/yunshu-guide/audio/';
+
+  // 版本号必须拼在文件名之后（拼在目录后面会变成 /audio/?v=x/xx.mp3 这种废路径）。
+  // github.io 的 max-age 是 600 秒，微信缓存更久，换版本号才能让用户拿到新音频。
+  var AUDIO_VER = '20260922a';
+
+  function trackUrl(fileOrId) {
+    if (!fileOrId) return '';
+    if (/^data:/.test(fileOrId)) return fileOrId;
+    var u = /^(https?:)?\/\//.test(fileOrId) ? fileOrId : (AUDIO_BASE + fileOrId);
+    return u + (u.indexOf('?') >= 0 ? '' : ('?v=' + AUDIO_VER));
+  }
+
+  // ============================================================
+  // 音量总线：把 <audio> 元素接到 WebAudio 增益节点
+  // iOS / 微信不允许脚本改 <audio>.volume，必须走这条路径
+  // ============================================================
+  var busCtx = null;
+  var busReady = false;
+  var busTried = false;
+
+  function initBus() {
+    if (busTried) return busReady;
+    busTried = true;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      busCtx = new AC();
+      busReady = true;
+    } catch (e) {
+      busCtx = null;
+      busReady = false;
+    }
+    return busReady;
+  }
+
+  // 首次用户手势时唤醒 AudioContext（移动端必须在手势内 resume）
+  function unlockBus() {
+    if (!initBus() || !busCtx) return;
+    if (busCtx.state === 'suspended' && busCtx.resume) {
+      try { busCtx.resume(); } catch (e) {}
+    }
+  }
+
+  if (typeof document !== 'undefined') {
+    var unlockOnce = function() {
+      unlockBus();
+      if (busCtx && busCtx.state === 'running') {
+        document.removeEventListener('touchstart', unlockOnce, true);
+        document.removeEventListener('touchend', unlockOnce, true);
+        document.removeEventListener('mousedown', unlockOnce, true);
+        document.removeEventListener('click', unlockOnce, true);
+      }
+    };
+    document.addEventListener('touchstart', unlockOnce, true);
+    document.addEventListener('touchend', unlockOnce, true);
+    document.addEventListener('mousedown', unlockOnce, true);
+    document.addEventListener('click', unlockOnce, true);
+  }
+
+  // ============================================================
+  // FileTrack —— 单个音频文件的播放控制
+  // ============================================================
+  function FileTrack(url, loop, volume) {
+    this.url = url;
+    this.loop = loop !== false;
+    this.volume = volume == null ? 0.6 : volume;
+    this.el = null;
+    this.node = null;      // WebAudio 增益节点（可用时）
+    this.playing = false;
+    this.ok = false;       // 是否曾成功播放过
+    this.broken = false;   // 加载失败，别再试了
+    this.onError = null;
+  }
+
+  FileTrack.prototype._ensure = function() {
+    if (this.el || this.broken || !this.url) return this.el;
+    var self = this;
+    try {
+      var a = document.createElement('audio');
+      a.preload = 'auto';
+      a.loop = this.loop;
+      a.src = this.url;
+      // 不设 crossOrigin：同源资源无需 CORS 头，设了反而可能被拒
+      a.setAttribute('playsinline', 'true');
+      a.setAttribute('webkit-playsinline', 'true');
+      a.addEventListener('error', function() {
+        self.broken = true;
+        self.playing = false;
+        if (self.onError) self.onError();
+      });
+      a.addEventListener('ended', function() { self.playing = false; });
+
+      // 音量：优先走 WebAudio 增益（iOS 生效），否则退回 el.volume
+      if (busReady && busCtx && busCtx.state === 'running' && busCtx.createMediaElementSource) {
+        try {
+          var src = busCtx.createMediaElementSource(a);
+          var g = busCtx.createGain();
+          g.gain.value = this.volume;
+          src.connect(g);
+          g.connect(busCtx.destination);
+          this.node = g;
+        } catch (e) {
+          this.node = null;
+        }
+      }
+      if (!this.node) a.volume = Math.max(0, Math.min(1, this.volume));
+
+      this.el = a;
+    } catch (e) {
+      this.broken = true;
+    }
+    return this.el;
+  };
+
+  FileTrack.prototype.setVolume = function(v) {
+    this.volume = v;
+    if (this.node) {
+      try { this.node.gain.value = v; } catch (e) {}
+    }
+    if (this.el && !this.node) {
+      try { this.el.volume = Math.max(0, Math.min(1, v)); } catch (e) {}
+    }
+  };
+
+  FileTrack.prototype.play = function() {
+    if (this.broken) return false;
+    var el = this._ensure();
+    if (!el) return false;
+    var self = this;
+    this.playing = true;
+    unlockBus();
+    try {
+      var pr = el.play();
+      if (pr && pr.catch) {
+        pr.catch(function(err) {
+          // AbortError 是切换曲目时的正常中断，不算失败
+          if (err && err.name === 'AbortError') return;
+          self.playing = false;
+          if (self.onError) self.onError(err);
+        });
+      }
+      return true;
+    } catch (e) {
+      this.playing = false;
+      if (this.onError) this.onError(e);
+      return false;
+    }
+  };
+
+  FileTrack.prototype.pause = function() {
+    this.playing = false;
+    if (this.el) {
+      try { this.el.pause(); } catch (e) {}
+    }
+  };
+
+  FileTrack.prototype.rewind = function() {
+    if (this.el) { try { this.el.currentTime = 0; } catch (e) {} }
+  };
+
+  FileTrack.prototype.release = function() {
+    this.pause();
+    if (this.el) {
+      try { this.el.removeAttribute('src'); this.el.load(); } catch (e) {}
+    }
+    this.el = null;
+    this.node = null;
+  };
 
   var audioCtx = null;
   function getCtx() {
@@ -3257,7 +3469,9 @@ window.TUTORIAL_VIDEO = {
     bgPlaying = false;
   }
 
-  function playBg() {
+  // ↓↓↓ 以下为 v4 实时合成器，现作为兜底引擎（文件不可用时使用）↓↓↓
+
+  function synthPlayBg() {
     getCtx();
     if (bgPlaying) return false;
     bgUserEnabled = true;
@@ -3271,19 +3485,13 @@ window.TUTORIAL_VIDEO = {
     return true;
   }
 
-  function pauseBg() {
+  function synthPauseBg() {
     if (!bgPlaying) return false;
     stopBgImmediate();
     bgUserEnabled = false;
     bgPausedByMeditation = false;
     if (bgOnStateChange) bgOnStateChange({ playing: false });
     return true;
-  }
-
-  function toggleBg() {
-    if (bgPlaying) pauseBg();
-    else playBg();
-    return bgPlaying;
   }
 
   function duckBgForMeditation() {
@@ -3353,7 +3561,7 @@ window.TUTORIAL_VIDEO = {
     }
   }
 
-  function playMeditation(url, trackName, trackId) {
+  function synthPlayMeditation(url, trackName, trackId) {
     getCtx();
 
     if (!trackBuilders[trackId]) {
@@ -3417,7 +3625,7 @@ window.TUTORIAL_VIDEO = {
     }, 50);
   }
 
-  function pauseMeditation() {
+  function synthPauseMeditation() {
     if (!medPlaying) return;
     stopMeditationImmediate();
     if (medOnStateChange) {
@@ -3426,30 +3634,14 @@ window.TUTORIAL_VIDEO = {
     restoreBgAfterMeditation();
   }
 
-  function toggleMeditation(url, trackName, trackId) {
-    if (medCurrentId === trackId && medPlaying) {
-      pauseMeditation();
-    } else {
-      playMeditation(url, trackName, trackId);
-    }
-  }
-
-  function setMeditationVolume(val) {
+  function synthSetMeditationVolume(val) {
     medVolume = val;
   }
 
-  function seekMeditation(seconds) {
+  function synthSeekMeditation(seconds) {
     if (medPlaying) {
       medStartTime = getCtx().currentTime - seconds;
     }
-  }
-
-  function getCurrentMeditation() {
-    return medCurrentId ? { id: medCurrentId, name: medCurrentName, url: '' } : null;
-  }
-
-  function isMeditationPlaying() {
-    return medPlaying;
   }
 
   function formatTime(seconds) {
@@ -3459,15 +3651,310 @@ window.TUTORIAL_VIDEO = {
     return mins + ':' + (secs < 10 ? '0' : '') + secs;
   }
 
+  // ============================================================
+  // 对外 API：优先播放音频文件，失败自动回落 v4 合成器
+  // ============================================================
+
+  var bgMode = 'none';    // 'file' | 'synth' | 'none'
+  var atmMode = 'none';
+  var medMode = 'none';
+
+  var fileBg = null, fileAtm = null, fileMed = null;
+
+  var bgVolumeVal = (window.BG_MUSIC && window.BG_MUSIC.defaultVolume) || 0.3;
+  var atmVolume = (window.ATMOSPHERE_MUSIC && window.ATMOSPHERE_MUSIC.defaultVolume) || 0.45;
+  var atmPlaying = false;
+  var atmOnStateChange = null;
+
+  function medDurationOf(t) {
+    var el = t && t.el;
+    var d = el ? el.duration : NaN;
+    if (isFinite(d) && d > 0) return d;
+    return medDuration > 0 ? medDuration : 180;
+  }
+
+  function bgFileUrl() {
+    var m = window.BG_MUSIC || {};
+    return trackUrl(m.file || m.url || 'bg-qingjing.mp3');
+  }
+
+  function atmFileUrl() {
+    var m = window.ATMOSPHERE_MUSIC || {};
+    return trackUrl(m.file || m.url || 'atmosphere-daoguan.mp3');
+  }
+
+  // ---------- 全局背景音乐 ----------
+  function playBg() {
+    if (bgMode !== 'none') return false;
+    pauseAtmosphere();                     // 两路音乐不叠，避免糊成一团
+    bgUserEnabled = true;
+    bgPausedByMeditation = false;
+
+    var t = new FileTrack(bgFileUrl(), true, bgVolumeVal);
+    t.onError = function() {
+      if (bgMode !== 'file' || fileBg !== t) return;
+      fileBg = null;
+      bgMode = 'none';
+      if (synthPlayBg()) {
+        bgMode = 'synth';
+      } else if (bgOnStateChange) {
+        bgOnStateChange({ playing: false });
+      }
+    };
+    if (t.play()) {
+      fileBg = t;
+      bgMode = 'file';
+      if (bgOnStateChange) bgOnStateChange({ playing: true });
+      return true;
+    }
+    return false;
+  }
+
+  function pauseBg() {
+    if (bgMode === 'none') return false;
+    if (bgMode === 'file') {
+      if (fileBg) fileBg.pause();
+      fileBg = null;
+      bgMode = 'none';
+      bgUserEnabled = false;
+      bgPausedByMeditation = false;
+      if (bgOnStateChange) bgOnStateChange({ playing: false });
+      return true;
+    }
+    var r = synthPauseBg();
+    bgMode = 'none';
+    return r;
+  }
+
+  function toggleBg() {
+    if (bgMode !== 'none') pauseBg(); else playBg();
+    return bgMode !== 'none';
+  }
+
+  // 背景音乐让位给冥想曲（记住是"被按下去"的，结束后要恢复）
+  function duckBgForMed() {
+    if (bgMode === 'none') return;
+    if (bgMode === 'file') {
+      if (fileBg) fileBg.pause();
+      fileBg = null;
+      bgMode = 'none';
+      bgPausedByMeditation = true;
+      if (bgOnStateChange) bgOnStateChange({ playing: false });
+    } else {
+      duckBgForMeditation();               // v4 内部实现
+    }
+  }
+
+  function restoreBgAfterMed() {
+    if (!bgPausedByMeditation || !bgUserEnabled) {
+      bgPausedByMeditation = false;
+      return;
+    }
+    bgPausedByMeditation = false;
+    playBg();
+  }
+
+  // ---------- 仪式页 · 道观氛围音 ----------
+  // v4 里这个按钮调的其实是全局背景音乐（Player.toggleBg），所以仪式页和
+  // 顶栏背景音乐是同一首。v5 给它一首独立的 5 分钟道观氛围曲。
+  function playAtmosphere() {
+    if (atmMode !== 'none') return false;
+    pauseBg();
+    var t = new FileTrack(atmFileUrl(), true, atmVolume);
+    t.onError = function() {
+      if (atmMode !== 'file' || fileAtm !== t) return;
+      fileAtm = null;
+      atmMode = 'none';
+      atmPlaying = false;
+      if (atmOnStateChange) atmOnStateChange({ playing: false });
+    };
+    if (t.play()) {
+      fileAtm = t;
+      atmMode = 'file';
+      atmPlaying = true;
+      if (atmOnStateChange) atmOnStateChange({ playing: true });
+      return true;
+    }
+    return false;
+  }
+
+  function pauseAtmosphere() {
+    if (atmMode === 'none') return false;
+    if (fileAtm) fileAtm.pause();
+    fileAtm = null;
+    atmMode = 'none';
+    atmPlaying = false;
+    if (atmOnStateChange) atmOnStateChange({ playing: false });
+    return true;
+  }
+
+  function toggleAtmosphere() {
+    if (atmMode !== 'none') pauseAtmosphere(); else playAtmosphere();
+    return atmMode !== 'none';
+  }
+
+  // ---------- 祈愿烛专属曲 ----------
+  function stopMedFile() {
+    if (medTimer) { clearInterval(medTimer); medTimer = null; }
+    if (fileMed) {
+      fileMed.pause();
+      fileMed.rewind();
+    }
+    fileMed = null;
+  }
+
+  function medReportLoaded() {
+    if (medMode !== 'file' || !fileMed) return;
+    medDuration = medDurationOf(fileMed);
+    if (medOnLoaded) medOnLoaded({ duration: medDuration, trackId: medCurrentId });
+  }
+
+  function startMedProgress() {
+    if (medTimer) clearInterval(medTimer);
+    medTimer = setInterval(function() {
+      if (medMode !== 'file' || !fileMed || !fileMed.el) return;
+      var el = fileMed.el;
+      var d = medDurationOf(fileMed);
+      if (d > 0) medDuration = d;
+      if (medOnTimeUpdate) {
+        medOnTimeUpdate({
+          currentTime: el.currentTime || 0,
+          duration: medDuration,
+          trackId: medCurrentId
+        });
+      }
+    }, 500);
+  }
+
+  function medFallbackToSynth(trackId, trackName, url) {
+    synthPlayMeditation(url || (trackId + '.mp3'), trackName, trackId);
+    medMode = medPlaying ? 'synth' : 'none';
+  }
+
+  function playMeditation(url, trackName, trackId) {
+    // 停掉当前正在播的
+    if (medMode === 'file') {
+      stopMedFile();
+      medMode = 'none';
+    } else if (medMode === 'synth') {
+      synthPauseMeditation();
+      medMode = 'none';
+    }
+
+    medCurrentId = trackId;
+    medCurrentName = trackName;
+
+    var u = trackUrl(url);
+    if (u) {
+      var t = new FileTrack(u, true, medVolume);
+      t.onError = function() {
+        if (medMode !== 'file' || fileMed !== t) return;
+        stopMedFile();
+        medMode = 'none';
+        // 文件不可用 → 回落 v4 合成器，保证还有声音
+        if (medOnError) medOnError({ trackId: trackId, error: '音频文件加载失败，已切换为内置合成音' });
+        medFallbackToSynth(trackId, trackName, u);
+      };
+      if (t.play()) {
+        fileMed = t;
+        medMode = 'file';
+        duckBgForMed();
+        // 时长信息：元数据就绪后再上报，兼容慢网
+        if (fileMed.el) {
+          fileMed.el.addEventListener('loadedmetadata', medReportLoaded);
+          fileMed.el.addEventListener('durationchange', medReportLoaded);
+        }
+        startMedProgress();
+        if (medOnLoaded) medOnLoaded({ duration: medDurationOf(fileMed), trackId: trackId });
+        if (medOnStateChange) {
+          medOnStateChange({ playing: true, trackId: trackId, trackName: trackName });
+        }
+        return;
+      }
+    }
+    medFallbackToSynth(trackId, trackName, u);
+  }
+
+  function pauseMeditation() {
+    if (medMode === 'none') return;
+    if (medMode === 'file') {
+      stopMedFile();
+      medMode = 'none';
+      if (medOnStateChange) {
+        medOnStateChange({ playing: false, trackId: medCurrentId, trackName: medCurrentName });
+      }
+      restoreBgAfterMed();
+      return;
+    }
+    synthPauseMeditation();
+    medMode = 'none';
+    restoreBgAfterMed();
+  }
+
+  function toggleMeditation(url, trackName, trackId) {
+    if (medCurrentId === trackId && medMode !== 'none') {
+      pauseMeditation();
+    } else {
+      playMeditation(url, trackName, trackId);
+    }
+  }
+
+  function setMeditationVolume(val) {
+    medVolume = val;
+    if (fileMed) fileMed.setVolume(val);
+    synthSetMeditationVolume(val);
+  }
+
+  function seekMeditation(seconds) {
+    if (medMode === 'file' && fileMed && fileMed.el) {
+      try { fileMed.el.currentTime = Math.max(0, seconds); } catch (e) {}
+      return;
+    }
+    synthSeekMeditation(seconds);
+  }
+
+  function getCurrentMeditation() {
+    return medCurrentId
+      ? { id: medCurrentId, name: medCurrentName, url: fileMed ? fileMed.url : '' }
+      : null;
+  }
+
+  function isMeditationPlaying() {
+    return medMode !== 'none';
+  }
+
+  function isBgPlaying() {
+    return bgMode !== 'none';
+  }
+
+  function setBgVolume(v) {
+    bgVolumeVal = v;
+    if (fileBg) fileBg.setVolume(v);
+    if (fileAtm) fileAtm.setVolume(v);
+  }
+
   var AudioPlayer = {
+    // 全局背景音乐
     playBg: playBg,
     pauseBg: pauseBg,
     toggleBg: toggleBg,
-    isBgPlaying: function() { return bgPlaying; },
+    isBgPlaying: isBgPlaying,
     isBgUserEnabled: function() { return bgUserEnabled; },
-    setBgVolume: function() {},
+    setBgVolume: setBgVolume,
     onBgStateChange: function(cb) { bgOnStateChange = cb; },
 
+    // 仪式页道观氛围音
+    playAtmosphere: playAtmosphere,
+    pauseAtmosphere: pauseAtmosphere,
+    toggleAtmosphere: toggleAtmosphere,
+    isAtmospherePlaying: function() { return atmMode !== 'none'; },
+    setAtmosphereVolume: function(v) {
+      atmVolume = v;
+      if (fileAtm) fileAtm.setVolume(v);
+    },
+    onAtmosphereStateChange: function(cb) { atmOnStateChange = cb; },
+
+    // 祈愿烛专属曲
     playMeditation: playMeditation,
     pauseMeditation: pauseMeditation,
     toggleMeditation: toggleMeditation,
@@ -3479,6 +3966,9 @@ window.TUTORIAL_VIDEO = {
     onMeditationTimeUpdate: function(cb) { medOnTimeUpdate = cb; },
     onMeditationLoaded: function(cb) { medOnLoaded = cb; },
     onMeditationError: function(cb) { medOnError = cb; },
+
+    // 诊断：当前实际走的是文件还是合成兜底
+    _source: function() { return { bg: bgMode, atmosphere: atmMode, meditation: medMode }; },
 
     formatTime: formatTime,
   };
@@ -4770,7 +5260,9 @@ const CandleDetailPage = ({
     } else {
       setHasError(false);
       setLoading(true);
-      Player.playMeditation('', track.name, track.id);
+      // 必须把 track.url 传下去 —— v4 的 playMeditation 是忽略 url 的，
+      // v5 才会真正去加载这个音频文件（失败则自动回落内置合成器）
+      Player.playMeditation(track.url, track.name, track.id);
     }
   };
   const handleSeek = e => {
@@ -5037,7 +5529,7 @@ const IncensePage = ({
     } else {
       setHasError(false);
       setLoading(true);
-      Player.playMeditation('', incenseTrack.name, incenseTrack.id);
+      Player.playMeditation(incenseTrack.url, incenseTrack.name, incenseTrack.id);
     }
   };
   const handleSeek = e => {
@@ -5371,14 +5863,21 @@ const RitualPage = ({
     const handleState = state => {
       setAtmospherePlaying(state.playing);
     };
-    Player.onBgStateChange(handleState);
+    // 仪式页有自己的「道观氛围音」（独立成曲）。
+    // v4 里这里错用了 onBgStateChange / toggleBg，导致仪式页按钮控制的是全局背景音乐。
+    if (Player.onAtmosphereStateChange) {
+      Player.onAtmosphereStateChange(handleState);
+    }
+    if (Player.isAtmospherePlaying) {
+      setAtmospherePlaying(Player.isAtmospherePlaying());
+    }
     return () => {
-      Player.onBgStateChange(null);
+      if (Player.onAtmosphereStateChange) Player.onAtmosphereStateChange(null);
     };
   }, [Player]);
   const toggleAtmosphere = () => {
     if (!Player) return;
-    Player.toggleBg();
+    if (Player.toggleAtmosphere) Player.toggleAtmosphere();else Player.toggleBg();
   };
   const steps = [{
     num: '01',
