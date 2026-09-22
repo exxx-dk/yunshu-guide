@@ -2615,6 +2615,23 @@ window.TUTORIAL_VIDEO = {
     }
   }
 
+  // ★ 走 WebAudio 增益节点唯一的失败模式：AudioContext 被系统挂起（iOS 切后台
+  //   再回来、来电打断等）时，节点不出声 —— 表现为「进度条在走但没声音」。
+  //   这里做两道保险：可见性变化时补 resume，播放期间低频巡检补 resume。
+  var busyCount = 0;
+  function busGuard() {
+    if (!busCtx || busyCount <= 0) return;
+    if (busCtx.state === 'suspended' && busCtx.resume) {
+      try { busCtx.resume(); } catch (e) {}
+    }
+  }
+  setInterval(busGuard, 2500);
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden) busGuard();
+    });
+  }
+
   if (typeof document !== 'undefined') {
     var unlockOnce = function() {
       unlockBus();
@@ -2679,26 +2696,34 @@ window.TUTORIAL_VIDEO = {
       }
       FileTrack._host.appendChild(a);
 
-      // 音量：优先走 WebAudio 增益（iOS 生效），否则退回 el.volume
-      if (busReady && busCtx && busCtx.state === 'running' && busCtx.createMediaElementSource) {
-        try {
-          var src = busCtx.createMediaElementSource(a);
-          var g = busCtx.createGain();
-          g.gain.value = this.volume;
-          src.connect(g);
-          g.connect(busCtx.destination);
-          this.node = g;
-        } catch (e) {
-          this.node = null;
-        }
-      }
-      if (!this.node) a.volume = Math.max(0, Math.min(1, this.volume));
+      // 音量：优先走 WebAudio 增益（iOS 上 el.volume 是无效的），否则退回 el.volume
+      this._tryBus(a);
 
       this.el = a;
     } catch (e) {
       this.broken = true;
     }
     return this.el;
+  };
+
+  // 把元素接到 WebAudio 增益节点。元素建好之后 AudioContext 才解锁的话，
+  // 这里还会补挂一次 —— 否则同一页面上会出现「有的曲子音量受控、有的不受控」。
+  FileTrack.prototype._tryBus = function(el) {
+    el = el || this.el;
+    if (!el || this.node) return;
+    if (!initBus() || !busCtx || busCtx.state !== 'running') return;
+    if (!busCtx.createMediaElementSource) return;
+    try {
+      var src = busCtx.createMediaElementSource(el);
+      var g = busCtx.createGain();
+      g.gain.value = this.volume;
+      src.connect(g);
+      g.connect(busCtx.destination);
+      this.node = g;
+      try { el.volume = 1; } catch (e) {}   // 交给增益节点，避免两次衰减
+    } catch (e) {
+      this.node = null;
+    }
   };
 
   FileTrack.prototype.setVolume = function(v) {
@@ -2711,13 +2736,26 @@ window.TUTORIAL_VIDEO = {
     }
   };
 
+  // 诊断用：当前这个元素到底走的是增益节点还是 el.volume
+  FileTrack.prototype.diag = function() {
+    return {
+      url: (this.url || '').split('/').pop(),
+      bus: !!this.node,
+      gain: this.node ? +this.node.gain.value.toFixed(3) : null,
+      elVol: this.el ? +this.el.volume.toFixed(3) : null,
+      vol: this.volume,
+    };
+  };
+
   FileTrack.prototype.play = function() {
     if (this.broken) return false;
     var el = this._ensure();
     if (!el) return false;
     var self = this;
+    if (!this.playing) busyCount++;
     this.playing = true;
     unlockBus();
+    this._tryBus(el);        // 解锁后再补挂一次
     try {
       var pr = el.play();
       if (pr && pr.catch) {
@@ -2737,6 +2775,7 @@ window.TUTORIAL_VIDEO = {
   };
 
   FileTrack.prototype.pause = function() {
+    if (this.playing && busyCount > 0) busyCount--;
     this.playing = false;
     if (this.el) {
       try { this.el.pause(); } catch (e) {}
@@ -4010,8 +4049,19 @@ window.TUTORIAL_VIDEO = {
     onMeditationLoaded: function(cb) { medOnLoaded = cb; },
     onMeditationError: function(cb) { medOnError = cb; },
 
-    // 诊断：当前实际走的是文件还是合成兜底
-    _source: function() { return { bg: bgMode, atmosphere: atmMode, meditation: medMode }; },
+    // 诊断：当前实际走的是文件还是合成兜底，以及音量是走增益节点还是 el.volume
+    _source: function() {
+      return {
+        bg: bgMode, atmosphere: atmMode, meditation: medMode,
+        bus: busCtx ? busCtx.state : 'none',
+        vol: {
+          bg: fileBg ? fileBg.diag() : null,
+          atmosphere: fileAtm ? fileAtm.diag() : null,
+          meditation: fileMed ? fileMed.diag() : null,
+        },
+        cached: Object.keys(trackCache),
+      };
+    },
 
     formatTime: formatTime,
   };
