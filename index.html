@@ -2332,9 +2332,10 @@ window.PRODUCTS = [
     track: {
       id: 'najin-1',
       name: '纳金 · 流水生财',
-      // 纯 Web Audio 生成，无外部URL
+      file: 'najin.mp3',
+      artist: 'Shockwave-Sound · How Beautiful Life',
       url: '',
-      duration: 180,
+      duration: 261,
     }
   },
   {
@@ -2355,8 +2356,10 @@ window.PRODUCTS = [
     track: {
       id: 'shoucang-1',
       name: '守藏 · 安住稳固',
+      file: 'shoucang.mp3',
+      artist: '风潮音乐 · Healing hands',
       url: '',
-      duration: 180,
+      duration: 386,
     }
   },
   {
@@ -2377,8 +2380,10 @@ window.PRODUCTS = [
     track: {
       id: 'dengke-1',
       name: '登科 · 平步青云',
+      file: 'dengke.mp3',
+      artist: '风潮音乐 · 光之礼',
       url: '',
-      duration: 180,
+      duration: 523,
     }
   },
   {
@@ -2399,8 +2404,10 @@ window.PRODUCTS = [
     track: {
       id: 'liangyuan-1',
       name: '良缘 · 暖意萦庭',
+      file: 'liangyuan.mp3',
+      artist: '森水垚 / 沐灵仙 / 尚衡 · 海的回响',
       url: '',
-      duration: 180,
+      duration: 213,
     }
   },
   {
@@ -2421,8 +2428,10 @@ window.PRODUCTS = [
     track: {
       id: 'hehe-1',
       name: '和合 · 和风顺畅',
+      file: 'hehe.mp3',
+      artist: '风潮音乐 · Kadikoy - halkidon',
       url: '',
-      duration: 180,
+      duration: 152,
     }
   },
   {
@@ -2443,8 +2452,10 @@ window.PRODUCTS = [
     track: {
       id: 'zhuyan-1',
       name: '驻颜 · 芳华凝住',
+      file: 'zhuyan.mp3',
+      artist: 'Mayrain · Lavender',
       url: '',
-      duration: 180,
+      duration: 620,
     }
   },
   {
@@ -2465,8 +2476,10 @@ window.PRODUCTS = [
     track: {
       id: 'bole-1',
       name: '伯乐 · 贵人引路',
+      file: 'bole.mp3',
+      artist: 'Dennis Kuo · A Broken Heart Heals with Time',
       url: '',
-      duration: 180,
+      duration: 273,
     }
   },
   {
@@ -2487,37 +2500,50 @@ window.PRODUCTS = [
     track: {
       id: 'qingzhang-1',
       name: '清障 · 净光遍照',
+      file: 'qingzhang.mp3',
+      artist: 'Soki · 令人放松的溪流声',
       url: '',
-      duration: 180,
+      duration: 600,
     }
   }
 ];
 
-// 音乐由「原创离线渲染音频」提供（numpy/scipy 程序化合成 → 卷积混响 → MP3），
-// 同源托管在 GitHub Pages 的 /audio/ 目录下，微信内置浏览器可直接播放。
-// 若文件不可达，audio.js 会自动回落到内置的实时合成器。
+// 音乐为授权曲目转码（128kbps MP3），同源托管在 GitHub Pages 的 /audio/ 目录下，
+// 微信内置浏览器可直接播放。文件名固定为语义名，见下方 file 字段。
+// 注意：v5 的实时合成兜底已关闭（window.SYNTH_FALLBACK = false），
+// 文件不可达时静默失败，不会退回旧合成音。
 window.AUDIO_BASE = 'https://exxx-dk.github.io/yunshu-guide/audio/';
 
-// 全局背景音乐
+// 全局背景音乐（进站即响，右上角可关）
 window.BG_MUSIC = {
-  name: '云舒 · 清境',
-  file: 'bg-qingjing.mp3',      // 240s · D调 · 极简禅意，长时间循环用
-  defaultVolume: 0.3,
+  name: '探触寂静',
+  file: 'bg.mp3',               // 9:44 · 极简留白，长时间循环用
+  defaultVolume: 0.28,
+  artist: '风潮音乐',
 };
 
-// 仪式指南页 · 道观氛围音（独立成曲）
+// 仪式指南页 · 氛围音（独立成曲）
 window.ATMOSPHERE_MUSIC = {
-  name: '道观氛围',
-  file: 'atmosphere-daoguan.mp3', // 300s · A调 · 深沉肃穆，大混响
-  defaultVolume: 0.45,
+  name: '癒合寺碗',
+  file: 'atmosphere.mp3',       // 9:58 · 颂钵共鸣，寺庙气
+  defaultVolume: 0.4,
+  artist: '自然的聲音',
 };
 
-// 八首祈愿烛专属曲：按 track.id 自动拼出 URL，新增产品无需再手填
+// 线香页 · 静修音乐
+window.INCENSE_MUSIC = {
+  name: '灵气',
+  file: 'incense.mp3',          // 10:02 · 冥想安定，回归本心
+  defaultVolume: 0.5,
+  artist: '风潮音乐',
+};
+
+// 八首祈愿烛专属曲：优先用 track.file，缺省按 track.id 拼接
 (function () {
   var base = window.AUDIO_BASE;
   (window.PRODUCTS || []).forEach(function (p) {
-    if (p.track && p.track.id) {
-      p.track.file = p.track.id + '.mp3';
+    if (p.track) {
+      p.track.file = p.track.file || (p.track.id + '.mp3');
       p.track.url = base + p.track.file;
     }
   });
@@ -2546,21 +2572,26 @@ window.TUTORIAL_VIDEO = {
   ]
 };
 </script>
-  <script>// ===== 云舒 · 冥想音乐引擎 v5 =====
+  <script>// ===== 云舒 · 冥想音乐引擎 v6 =====
 //
-// v4 → v5 变更（2026-09-22）：
+// v5 → v6 变更（2026-10-04）：
+//   1) 全部换用授权曲目（原曲 320kbps → 转码 128kbps），旧的自制合成音已下线：
+//        全局背景音乐  → bg.mp3          （探触寂静 9:44）
+//        仪式页氛围音   → atmosphere.mp3  （癒合寺碗 9:58）
+//        线香页静修曲   → incense.mp3     （灵气 10:02）
+//        八首祈愿烛曲   → <productId>.mp3 （4:21 ~ 10:20 不等）
+//   2) **合成兜底默认关闭**（window.SYNTH_FALLBACK 未显式置 true 时不启用）。
+//      旧版是「文件失败 → 回落 v4 实时合成器」，但用户明确不要那批合成音；
+//      现在文件不可达就静默关掉并在 UI 上提示，不会突然冒出电子琴声。
+//   3) 播放香方专属曲时，背景音乐改为**用户级关闭**（不再是"临时让位、结束后恢复"）。
+//
+// v4→v5 原有说明：
 //   1) 音乐改为播放「原创离线渲染音频文件」，不再是 Web Audio 实时合成。
-//      原因：v4 全曲只有正弦波振荡器、没有任何混响、音符之间是数字静音，
-//      听感像电子琴试音，不是冥想音乐。新音频用卷积混响 + 模态合成 + 持续垫音重做。
-//   2) 三处播放位置各自独立成曲：
-//        全局背景音乐  → bg-qingjing.mp3        （240s）
-//        仪式页道观氛围 → atmosphere-daoguan.mp3 （300s，v4 里它错用了全局背景音乐）
-//        八首祈愿烛曲   → <trackId>.mp3          （各 180s）
+//   2) 三处播放位置各自独立成曲。
 //   3) 全部同源托管（github.io 同域），微信内置浏览器可直接播放。
-//      v4 的实时合成器完整保留为兜底：任何文件加载失败都会自动回落，保证始终有声音。
 //   4) 音量优先经 WebAudio GainNode —— iOS 上 <audio>.volume 是无效的。
 //
-// v4 原有说明（合成兜底部分）：
+// v4 原有说明（合成兜底部分，现已默认关闭）：
 //   节点统一管理 + 立即停止 + 干净切换
 //   风格：极简 · 稀疏 · 留白 · 古琴 · 箫/埙 · 钟声
 
@@ -2575,7 +2606,12 @@ window.TUTORIAL_VIDEO = {
 
   // 版本号必须拼在文件名之后（拼在目录后面会变成 /audio/?v=x/xx.mp3 这种废路径）。
   // github.io 的 max-age 是 600 秒，微信缓存更久，换版本号才能让用户拿到新音频。
-  var AUDIO_VER = '20260922a';
+  // v6：2026-10-04 全站换成授权曲目，务必换号，否则老用户拿到的还是旧合成音频。
+  var AUDIO_VER = '20261004a';
+
+  // ★ 合成兜底开关。false = 文件不可达时静默失败（不退回 v4 实时合成器）。
+  //   要临时救急可在引入 audio.js 之前加 <script>window.SYNTH_FALLBACK = true;<\/script>
+  var SYNTH_FALLBACK = (window.SYNTH_FALLBACK === true);
 
   function trackUrl(fileOrId) {
     if (!fileOrId) return '';
@@ -3650,8 +3686,8 @@ window.TUTORIAL_VIDEO = {
       }
     }
 
-    // 背景音乐暂停
-    duckBgForMeditation();
+    // 背景音乐关闭（v6：用户级关闭，不再自动恢复）
+    duckBgForMed();
 
     medCurrentId = trackId;
     medCurrentName = trackName;
@@ -3747,18 +3783,31 @@ window.TUTORIAL_VIDEO = {
 
   function bgFileUrl() {
     var m = window.BG_MUSIC || {};
-    return trackUrl(m.file || m.url || 'bg-qingjing.mp3');
+    return trackUrl(m.file || m.url || 'bg.mp3');
   }
 
   function atmFileUrl() {
     var m = window.ATMOSPHERE_MUSIC || {};
-    return trackUrl(m.file || m.url || 'atmosphere-daoguan.mp3');
+    return trackUrl(m.file || m.url || 'atmosphere.mp3');
+  }
+
+  // ============================================================
+  // ★ 全站单路音乐（互斥）
+  // 用户要求：点开一个音乐，其他音乐全部要停，绝不能两路叠着响。
+  // keep = 'bg' | 'atm' | 'med'，表示"即将播放、要保留的那一路"。
+  // 之前只有 playBg 里调了 pauseAtmosphere，playMeditation 什么都没做，
+  // 于是「先开仪式页道观氛围 → 再去点纳金」，道观还在响 → 就是这个 bug。
+  // ============================================================
+  function soloOnly(keep) {
+    if (keep !== 'bg')  pauseBg();
+    if (keep !== 'atm') pauseAtmosphere();
+    if (keep !== 'med') pauseMeditation();
   }
 
   // ---------- 全局背景音乐 ----------
   function playBg() {
     if (bgMode !== 'none') return false;
-    pauseAtmosphere();                     // 两路音乐不叠，避免糊成一团
+    soloOnly('bg');                        // 其余两路一律先停
     bgUserEnabled = true;
     bgPausedByMeditation = false;
 
@@ -3767,7 +3816,8 @@ window.TUTORIAL_VIDEO = {
       if (bgMode !== 'file' || fileBg !== t) return;
       fileBg = null;
       bgMode = 'none';
-      if (synthPlayBg()) {
+      // 合成兜底默认关闭：文件不可达就静默关掉，不退回旧合成音
+      if (SYNTH_FALLBACK && synthPlayBg()) {
         bgMode = 'synth';
       } else if (bgOnStateChange) {
         bgOnStateChange({ playing: false });
@@ -3802,19 +3852,24 @@ window.TUTORIAL_VIDEO = {
     return bgMode !== 'none';
   }
 
-  // 背景音乐让位给冥想曲（记住是"被按下去"的，结束后要恢复）
+  // ★ v6：播放香方专属曲时，背景音乐「用户级关闭」——不是临时让位。
+  //   用户明确要求：背景音乐开着时点香方音乐，背景音乐自动关掉；
+  //   而且香方音乐停了也不自动恢复（想再听就自己点右上角开关）。
   function duckBgForMed() {
+    bgPausedByMeditation = false;   // 不留"待恢复"标记
+    bgUserEnabled = false;          // 按钮状态同步为「关」
     if (bgMode === 'none') return;
     if (bgMode === 'file') {
       if (fileBg) fileBg.pause();
       bgMode = 'none';
-      bgPausedByMeditation = true;
       if (bgOnStateChange) bgOnStateChange({ playing: false });
     } else {
-      duckBgForMeditation();               // v4 内部实现
+      synthPauseBg();
     }
   }
 
+  // v6 起 duckBgForMed 会把 bgUserEnabled 置 false，所以这里永远不会自动恢复。
+  // 保留函数是为了兼容旧调用点；逻辑本身不改。
   function restoreBgAfterMed() {
     if (!bgPausedByMeditation || !bgUserEnabled) {
       bgPausedByMeditation = false;
@@ -3829,7 +3884,7 @@ window.TUTORIAL_VIDEO = {
   // 顶栏背景音乐是同一首。v5 给它一首独立的 5 分钟道观氛围曲。
   function playAtmosphere() {
     if (atmMode !== 'none') return false;
-    pauseBg();
+    soloOnly('atm');                       // 背景音乐与香方曲都要让路
     var t = makeTrack(atmFileUrl(), true, atmVolume);
     t.onError = function() {
       if (atmMode !== 'file' || fileAtm !== t) return;
@@ -3919,6 +3974,10 @@ window.TUTORIAL_VIDEO = {
     }
     if (switching) medStopTimer();
 
+    // ★ 单路互斥：背景音乐 + 仪式页氛围音 都要停掉。
+    // 这是修「道观氛围还在响、又叠上纳金」的关键一行。
+    soloOnly('med');
+
     medCurrentId = trackId;
     medCurrentName = trackName;
 
@@ -3932,9 +3991,9 @@ window.TUTORIAL_VIDEO = {
         medPauseFile();
         fileMed = null;
         medMode = 'none';
-        // 文件不可用 → 回落 v4 合成器，保证还有声音
-        if (medOnError) medOnError({ trackId: trackId, error: '音频文件加载失败，已切换为内置合成音' });
-        medFallbackToSynth(trackId, trackName, u);
+        if (medOnError) medOnError({ trackId: trackId, error: '音频文件加载失败' });
+        // 合成兜底默认关闭：只报错，不退回旧合成器
+        if (SYNTH_FALLBACK) medFallbackToSynth(trackId, trackName, u);
       };
       if (t.play()) {
         var isNew = (fileMed !== t);
@@ -3953,6 +4012,17 @@ window.TUTORIAL_VIDEO = {
         }
         return;
       }
+    }
+    // 连 t.play() 都没成功（多半是被浏览器 autoplay 策略拦下）
+    if (!SYNTH_FALLBACK) {
+      medMode = 'none';
+      medPlaying = false;
+      medStopTimer();
+      if (medOnError) medOnError({ trackId: trackId, error: '音频未能开始播放，请再点一次' });
+      if (medOnStateChange) {
+        medOnStateChange({ playing: false, trackId: trackId, trackName: trackName });
+      }
+      return;
     }
     medFallbackToSynth(trackId, trackName, u);
   }
@@ -4016,6 +4086,10 @@ window.TUTORIAL_VIDEO = {
   }
 
   var AudioPlayer = {
+    // ★ 一键停掉所有音乐（三路互斥的兜底入口）。
+    // 目前给教学视频用：视频自带声音，一开播就把网页音乐全停，避免叠音。
+    pauseAll: function() { soloOnly(null); },
+
     // 全局背景音乐
     playBg: playBg,
     pauseBg: pauseBg,
@@ -5567,10 +5641,17 @@ const IncensePage = ({
   const [loading, setLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  // 线香页用清障音乐（净化、静修主题）
+  // 线香页静修曲（v6 起独立成曲，不再借用清障）
   const products = window.PRODUCTS || [];
   const qingzhangProd = products.find(p => p.id === 'qingzhang');
-  const incenseTrack = qingzhangProd ? qingzhangProd.track : null;
+  // v6：线香页有自己的一首静修曲（《灵气》），不再借用清障的曲子
+  const incenseMeta = window.INCENSE_MUSIC;
+  const incenseTrack = incenseMeta ? {
+    id: 'incense',
+    name: incenseMeta.name,
+    url: (window.AUDIO_BASE || '') + incenseMeta.file,
+    duration: 602
+  } : qingzhangProd ? qingzhangProd.track : null;
   useEffect(() => {
     if (!Player || !incenseTrack) return;
     const handleState = state => {
@@ -6124,6 +6205,16 @@ const TutorialVideoPage = ({
     const el = videoRef.current;
     if (el) el.load();
   };
+
+  // 视频自带声音：一开播就把网页上的音乐全部停掉，避免和配乐叠着响。
+  useEffect(() => {
+    const el = videoRef.current;
+    const Player = window.AudioPlayer;
+    if (!el || !Player || !Player.pauseAll) return;
+    const stopMusic = () => Player.pauseAll();
+    el.addEventListener('play', stopMusic);
+    return () => el.removeEventListener('play', stopMusic);
+  }, []);
   return /*#__PURE__*/React.createElement("div", {
     className: "page page-enter"
   }, /*#__PURE__*/React.createElement(NavBar, {
@@ -6229,8 +6320,35 @@ const App = () => {
     };
   }, [bgPlayer]);
 
-  // 背景音乐默认关闭，用户点击右上角按钮才开启
-
+  // ★ 进站即有背景音乐。
+  // 浏览器（尤其 iOS / 微信）不允许「没被用户碰过」就出声，所以挂一次性监听：
+  // 第一次 touch / click / keydown 才真正 playBg()，随后自解绑。
+  // capture=true 是刻意的 —— 万一用户第一下点的正是右上角「背景音乐」开关，
+  // 也是先启动、再由 toggleBg 关掉，最终状态和用户意图一致。
+  // 注：audio.js 里同名的 unlockOnce 监听注册更早，会先跑（先 resume AudioContext）。
+  useEffect(() => {
+    if (!bgPlayer) return;
+    let fired = false;
+    const off = () => {
+      document.removeEventListener('touchstart', start, true);
+      document.removeEventListener('touchend', start, true);
+      document.removeEventListener('mousedown', start, true);
+      document.removeEventListener('click', start, true);
+      document.removeEventListener('keydown', start, true);
+    };
+    const start = () => {
+      if (fired) return;
+      fired = true;
+      off();
+      if (!bgPlayer.isBgPlaying()) bgPlayer.playBg();
+    };
+    document.addEventListener('touchstart', start, true);
+    document.addEventListener('touchend', start, true);
+    document.addEventListener('mousedown', start, true);
+    document.addEventListener('click', start, true);
+    document.addEventListener('keydown', start, true);
+    return off;
+  }, [bgPlayer]);
   const toggleBgMusic = () => {
     if (!bgPlayer) return;
     bgPlayer.toggleBg();
