@@ -6402,6 +6402,43 @@ const App = () => {
     document.addEventListener('keydown', start, true);
     return off;
   }, [bgPlayer]);
+
+  // ★ 进站就先抓教学视频的「索引」。
+  // 视频要出第一帧，必须先下完文件最前面的 moov 索引（约 1MB）——这是唯一的硬性门槛。
+  // 而视频页是点进去才挂载的，等于所有等待都堆在"点了之后"。这里在首页就把这 1MB
+  // 拉进浏览器缓存，用户读简介的那几秒里它已经下好了，点进去几乎立刻出画面。
+  // 只取 1.2MB 就停（Range），不会把 84MB 整部拉下来；省流量模式下自动跳过。
+  useEffect(() => {
+    const meta = window.TUTORIAL_VIDEO;
+    if (!meta || !meta.src || typeof fetch !== 'function') return;
+    const conn = navigator.connection;
+    if (conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || ''))) return;
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    let alive = true;
+    fetch(meta.src, {
+      headers: {
+        Range: 'bytes=0-1258291'
+      },
+      signal: ctl ? ctl.signal : undefined
+    }).then(r => {
+      // 服务器若不认 Range 会回 200 + 整个 84MB，这种情况立刻放弃，不能把整部拉下来
+      if (r.status === 200) {
+        if (ctl) ctl.abort();
+        return null;
+      }
+      return r.arrayBuffer();
+    }).then(() => {
+      // 数据已进缓存即可，多余连接不需要留着
+      if (alive && ctl) {
+        try {
+          ctl.abort();
+        } catch (e) {/* 忽略 */}
+      }
+    }).catch(() => {/* 预取失败不影响任何功能，视频照常按需加载 */});
+    return () => {
+      alive = false;
+    };
+  }, []);
   const toggleBgMusic = () => {
     if (!bgPlayer) return;
     bgPlayer.toggleBg();
